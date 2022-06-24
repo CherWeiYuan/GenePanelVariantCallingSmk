@@ -1,0 +1,2 @@
+intervals_list: "bed/hg38_UCD_gene_regulatory.bed"
+threads: 48
