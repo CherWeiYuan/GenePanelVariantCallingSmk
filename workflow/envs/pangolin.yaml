@@ -1,0 +1,30 @@
+name: pangolin
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1=conda_forge
+  - _openmp_mutex=4.5=2_gnu
+  - bzip2=1.0.8=h7f98852_4
+  - ca-certificates=2022.6.15=ha878542_0
+  - certifi=2018.8.24=py35_1001
+  - libffi=3.2.1=he1b5a44_1007
+  - libgcc-ng=12.1.0=h8d9b700_16
+  - libgomp=12.1.0=h8d9b700_16
+  - libstdcxx-ng=12.1.0=ha89aaad_16
+  - libzlib=1.2.12=h166bdaf_1
+  - ncurses=6.3=h27087fc_1
+  - openssl=1.0.2u=h516909a_0
+  - pip=20.3.4=pyhd8ed1ab_0
+  - python=3.5.5=h5001a0f_2
+  - pyvcf=0.6.8.dev0=py35_0
+  - readline=7.0=hf8c457e_1001
+  - setuptools=40.4.3=py35_0
+  - sqlite=3.28.0=h8b20d00_0
+  - tk=8.6.12=h27826a3_0
+  - wheel=0.37.1=pyhd8ed1ab_0
+  - xz=5.2.5=h516909a_1
+  - zlib=1.2.12=h166bdaf_1
+  - pip:
+    - pangolin==1.0.2
