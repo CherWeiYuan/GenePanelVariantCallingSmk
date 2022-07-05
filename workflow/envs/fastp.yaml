@@ -12,3 +12,4 @@ dependencies:
   - libstdcxx-ng=12.1.0=ha89aaad_16
   - libzlib=1.2.12=h166bdaf_1
   - zlib=1.2.12=h166bdaf_1
+prefix: /home/weiyuan/miniconda3/envs/fastp

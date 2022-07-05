@@ -3,3 +3,4 @@ channels:
   - conda-forge
   - bioconda
   - defaults
+prefix: /home/weiyuan/miniconda3/envs/gAnnotator_env
