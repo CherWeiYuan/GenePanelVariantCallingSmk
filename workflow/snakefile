@@ -1,5 +1,9 @@
 # To run: snakemake --use-conda --retries 3 --cores 48 
 # To test: snakemake --use-conda --cores 48 
+# Dry run: snakemake -n
+# Re-run a rule and its downstream: 
+# snakemake --cores 48 --use-conda --forceall spliceai
+# snakemake --forceall vep --cores 48 --use-conda
 # Caveats: 
 #   only for grch38 (fasta and spliceai setting)
 #   Nonmenclature: {sample}_R1_001.fastq.gz, {sample}_R2_001.fastq.gz
@@ -16,34 +20,34 @@ for name in listdir("fastq"):
     elif "_R2_001.fastq.gz" in name:
         sample_names.append(name[:-16])
     else:
-        exit("Sample name is not properly formatted as " +\
-        "{sample}_R1_001.fastq.gz, {sample}_R2_001.fastq.gz" +\
-        "for read 1 and read 2, respectively")
+        exit("Please format fastq file name as " +\
+        "{sample}_R1_001.fastq.gz & {sample}_R2_001.fastq.gz" +\
+        "for read 1 and read 2 & respectively")
+sample_names = list(set(sample_names))
+print(sample_names)
 
 rule all:
     input:
-        "results/quality_control/multiqc_report.html"
+        "multiqc_report.html"
 
 rule fastp:
     input:
-        read1="fastq/{sample}_R1_001.fastq.gz",
-        read2="fastq/{sample}_R2_001.fastq.gz"
+        read1=expand("fastq/{sample}_R1_001.fastq.gz", sample = sample_names),
+        read2=expand("fastq/{sample}_R2_001.fastq.gz", sample = sample_names)
     output:
         read1=temp("fastq/clean_{sample}_R1_001.fastq.gz"),
         read2=temp("fastq/clean_{sample}_R2_001.fastq.gz"),
-        report="results/quality_control/{sample}.fastp.html"
+        report="results/quality_control/{sample}.fastp.html",
+        json="results/quality_control/{sample}.fastp.json"
     conda:
         "envs/fastp.yaml"
     threads:
         config["threads"]
-    log:
-        "logs/fastp_{sample}.log"
     shell:
         "fastp -i {input.read1} -I {input.read2} "
-        "-o {output.read1} -O {output.read2} "
-        "-h {output.report} --detect_adapter_for_pe "
-        "--qualified_quality_phred 15 --unqualified_percent_limit 40 "
-        "--length_required 15 --thread {threads} > {log}"
+        "-o {output.read1} -O {output.read2} -h {output.report} -j {output.json}"
+        " --detect_adapter_for_pe --qualified_quality_phred 15 "
+        "--unqualified_percent_limit 40 --length_required 15 --thread {threads}"
 
 rule dragmap:
     input:
@@ -53,13 +57,11 @@ rule dragmap:
         temp("sam/{sample}.sam")
     conda:
         "envs/dragmap.yaml"
-    log:
-        "logs/dragen_{sample}.log"
     shell:
         "dragen-os -r resources/reference "
         "-1 {input.read1} -2 {input.read2} "
         "--output-directory sam/ "
-        "--output-file-prefix {wildcards.sample} > {log}"
+        "--output-file-prefix {wildcards.sample}"
 
 rule markduplicates:
     input:
@@ -74,7 +76,9 @@ rule markduplicates:
 
 rule calibratedrag:
     input:
-        bam="bam/{sample}.sorted.removed_duplicates.bam",
+        expand("bam/{sample}.sorted.removed_duplicates.bam", 
+               sample = sample_names)
+    params:
         genome="resources/genome/Homo_sapiens_assembly38_masked.fasta",
         str_table="resources/genome/Homo_sapiens_assembly38_masked.tsv"
     output:
@@ -83,116 +87,117 @@ rule calibratedrag:
         "envs/gatk4.yaml"
     threads:
         config["threads"]
-    log:
-        "logs/calibratedrag_{sample}.log"
     shell:
-        "gatk CalibrateDragstrModel -R {input.genome} -I {input.bam} "
-        "-str {input.str_table} --threads {threads} -O {output} > {log}"
+        "gatk CalibrateDragstrModel -R {params.genome} -I {input} "
+        "-str {params.str_table} --threads {threads} -O {output}"
 
 rule haplotypecaller:
     input:
-        bam="bam/{sample}.sorted.removed_duplicates.bam",
+        bam="bam/{sample}.sorted.removed_duplicates.bam", 
         genome="resources/genome/Homo_sapiens_assembly38_masked.fasta",
         interval_list=config["intervals_list"],
         dragstr_params="{sample}.dragstr_model.txt"
     output:
-        temp("vcf/{sample}_raw.vcf")
+        "vcf/raw/{sample}.raw.vcf"
     conda:
         "envs/gatk4.yaml"
     threads:
         config["threads"]
-    log:
-        "logs/haplotypecaller_{sample}.log"
     shell:
         "gatk HaplotypeCaller -R {input.genome} -I {input.bam} -O {output} "
         "--dragen-mode true --dragstr-params-path {input.dragstr_params} "
-        "--native-pair-hmm-threads {threads} > {log}"
+        "--native-pair-hmm-threads {threads}"
 
 rule hardfilter:
     input:
-        "vcf/{sample}_raw.vcf"
+        "vcf/raw/{sample}.raw.vcf"
     output:
-        temp("vcf/{sample}.hardfiltered.vcf")
+        "vcf/hardfiltered/{sample}.hardfiltered.vcf"
     conda:
         "envs/gatk4.yaml"
-    log:
-        "logs/hardfilter_{sample}.log"
     shell:
         "gatk VariantFiltration -V {input} "
         "--filter-expression 'QUAL < 10.4139' "
-        "--filter-name 'DRAGENHardQUAL' -O {output} > {log}"
+        "--filter-name 'DRAGENHardQUAL' -O {output}"
 
 rule vep:
     input:
-        vcf="vcf/{sample}.hardfiltered.vcf",
+        vcf="vcf/hardfiltered/{sample}.hardfiltered.vcf", 
         genome="resources/genome/Homo_sapiens_assembly38_masked.fasta"
     output:
-        temp("vcf/{sample}.vep.vcf")
+        out_vcf="vcf/vep/{sample}.vep.vcf",
+        report="results/vep_annotation/{sample}_variants_summary.html"
     conda:
         "envs/vep.yaml"
     shell:
-        "vep -i {input.vcf} -o {output} --cache --vcf "
+        "vep -i {input.vcf} --output_file {output.out_vcf} "
+        "--stats_file {output.report} --cache --vcf "
         "--dir_cache resources/vep_cache " 
-        "--species 'homo_sapiens' --force_overwrite --af_1kg --af_gnomad "
-        "--fasta {input.genome} --hgvs --offline "
+        "--species 'homo_sapiens' --force_overwrite "
+        "--af --max_af --af_1kg --af_gnomad "
+        "--fasta {input.genome} --hgvs --hgvsg --offline --minimal "
         "--custom resources/vep_cache/ClinVar/"
-        "clinvar.vcf.gz,ClinVar,vcf,exact,0,ClinVar,vcf,exact,0,CLNDN,"
-        "CLNDNINCL,CLNDISDB,CLNDISDBINCL,CLNHGVS,CLNREVSTAT,CLNSIG,CLNSIGCONF,"
-        "CLNSIGINCL,CLNVC,CLNVCSO,CLNVI,DBVARID,GENEINFO,MC,ORIGIN,SSR"                     
+        "clinvar.vcf.gz,ClinVar,vcf,exact,0,ClinVar,vcf,exact,0,AF_ESP,AF_EXAC,"
+        "AF_TGP,ALLELEID,CLNDN,CLNDNINCL,CLNDISDB,CLNDISDBINCL,CLNHGVS,CLNREVSTAT,"
+        "CLNSIG,CLNSIGCONF,CLNSIGINCL,CLNVC,CLNVCSO,CLNVI,DBVARID,GENEINFO,MC,"
+        "ORIGIN,RS,SSR "
+        "--custom resources/vep_cache/NARD/"
+        "NARD_MAF.hg38.liftover.sorted.vcf.gz,NARD,vcf,exact,0,AF,AF_MNG,AF_KOR,"
+        "AF_JPN,AF_CHN,AF_HKG"
 
 rule spliceai:
     input:
         genome="resources/genome/Homo_sapiens_assembly38_masked.fasta",
-        vcf="vcf/{sample}.vep.vcf"
+        vcf="vcf/vep/{sample}.vep.vcf"
     output:
-        temp("vcf/{sample}.spliceai.vcf")
+        "vcf/spliceai/{sample}.spliceai.vcf"
     conda:
         "envs/spliceai.yaml"
-    log:
-        "logs/spliceai_{sample}.log"
     shell:
-        "spliceai -I {input.vcf} -O {output} -R {input.genome} -A grch38 > {log}"
-
-# rule pangolin:
-#     input:
-#         genome="resources/genome/Homo_sapiens_assembly38_masked.fasta",
-#         vcf="vcf/{sample}.spliceai.vcf",
-#         annotation_db="resources/Pangolin/gencode.v38.annotation.db"
-#     output:
-#         "vcf/pangolin/{sample}.spliceai.pangolin.vcf"
-#     conda:
-#         "envs/pangolin.yaml"
-#     shell:
-#         "pangolin {input.vcf} {input.genome} {input.annotation_db} "
-#         "{wildcards.sample}"
+        "spliceai -I {input.vcf} -O {output} -R {input.genome} -A grch38"
 
 rule variantstotable:
     input:
-        "vcf/{sample}.spliceai.vcf"
+        "vcf/spliceai/{sample}.spliceai.vcf"
     output:
         "vcf/tsv/{sample}.tsv"
     conda:
         "envs/gatk4.yaml"
-    log:
-        "logs/variantstotable_{sample}.log"
     shell:
-        "gatk VariantsToTable -V {input} -F CHROM -F POS -F ID -F REF -F ALT "
-        "-F TYPE -F QUAL -F DP -F MQ -F MQRankSum -F QD -F ReadPosRankSum "
-        "-F SOR -F GT -F GQ -F DP -F AD -F VAF -F PL -F FILTER -F CSQ -F CLNDN "
-        "-F CLNDNINCL -F CLNDISDB -F CLNDISDBINCL -F CLNHGVS -F CLNREVSTAT "
-        "-F CLNSIG -F CLNSIGCONF -F CLNSIGINCL -F CLNVC -F CLNVCSO -F CLNVI "
-        "-F DBVARID -F GENEINFO -F MC -F ORIGIN -F SSR -F SpliceAI -F Pangolin "
-        "-GF AD -O {output} > {log}"
+        "gatk VariantsToTable -V {input} -O {output} --show-filtered "
+        "-F CHROM -F POS -F ID -F REF -F ALT "
+        "-GF AD -GF DP -GF GP -GF GQ -GF GT -GF PG -GF PL -F AC -F AF -F AN "
+        "-F BaseQRankSum -F DP -F DRAGstrInfo -F DRAGstrParams -F ExcessHet "
+        "-F FS -F InbreedingCoeff -F MLEAC -F MLEAF -F MQ -F MQRankSum -F QD "
+        "-F ReadPosRankSum -F SOR -F CSQ "
+
+rule finis:
+    input:
+        tsv="vcf/tsv/{sample}.tsv"
+    params:
+        gnomadcsv=config["gnomad_v3.1.2_csv"],
+        csq_heads=config["csq"],
+        filters=config["filter_tags"]
+    output:
+        directory("results/called_variants/{sample}/")
+    conda:
+        "envs/finis.yaml"
+    shell:
+        "python3 resources/finis/finis/finis.py "
+        "--vcf_tsv {input.tsv} --gnomadCSV {params.gnomadcsv} "
+        "--csq_headers {params.csq_heads} --filter_tags {params.filters} "
+        "--output {output}"
 
 rule multiqc:
     input:
-        expand("vcf/tsv/{sample}.tsv", sample = sample_names)
+        expand("results/called_variants/{sample}/{sample}_gnomadAnnotated.csv", 
+               sample = sample_names)
     output:
-        "results/multiqc_report"
+        "multiqc_report.html"
     conda:
         "envs/multiqc.yaml"
     shell:
-        "multiqc --force --ignore resources -o {output} ."
+        "multiqc --force --ignore resources ."
 
 onsuccess:
     print("Workflow finished, no error")
