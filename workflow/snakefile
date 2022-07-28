@@ -2,11 +2,11 @@
 # To test: snakemake --use-conda --cores 48 
 # Dry run: snakemake -n
 # Re-run a rule and its downstream: 
-# snakemake --cores 48 --use-conda --forceall spliceai
-# snakemake --forceall vep --cores 48 --use-conda
+# snakemake --cores 48 --use-conda -R spliceai
 # Caveats: 
 #   only for grch38 (fasta and spliceai setting)
-#   Nonmenclature: {sample}_R1_001.fastq.gz, {sample}_R2_001.fastq.gz
+#   Input fastq nonmenclature: {sample}_R1_001.fastq.gz, 
+                               {sample}_R2_001.fastq.gz
 
 configfile: "config/config.yaml"
 
@@ -32,8 +32,8 @@ rule all:
 
 rule fastp:
     input:
-        read1=expand("fastq/{sample}_R1_001.fastq.gz", sample = sample_names),
-        read2=expand("fastq/{sample}_R2_001.fastq.gz", sample = sample_names)
+        read1="fastq/{sample}_R1_001.fastq.gz",
+        read2="fastq/{sample}_R2_001.fastq.gz"
     output:
         read1=temp("fastq/clean_{sample}_R1_001.fastq.gz"),
         read2=temp("fastq/clean_{sample}_R2_001.fastq.gz"),
@@ -76,8 +76,7 @@ rule markduplicates:
 
 rule calibratedrag:
     input:
-        expand("bam/{sample}.sorted.removed_duplicates.bam", 
-               sample = sample_names)
+        "bam/{sample}.sorted.removed_duplicates.bam"
     params:
         genome="resources/genome/Homo_sapiens_assembly38_masked.fasta",
         str_table="resources/genome/Homo_sapiens_assembly38_masked.tsv"
@@ -94,9 +93,10 @@ rule calibratedrag:
 rule haplotypecaller:
     input:
         bam="bam/{sample}.sorted.removed_duplicates.bam", 
-        genome="resources/genome/Homo_sapiens_assembly38_masked.fasta",
-        interval_list=config["intervals_list"],
         dragstr_params="{sample}.dragstr_model.txt"
+    params: 
+        genome="resources/genome/Homo_sapiens_assembly38_masked.fasta",
+        interval_list=config["intervals_list"]
     output:
         "vcf/raw/{sample}.raw.vcf"
     conda:
@@ -104,9 +104,9 @@ rule haplotypecaller:
     threads:
         config["threads"]
     shell:
-        "gatk HaplotypeCaller -R {input.genome} -I {input.bam} -O {output} "
+        "gatk HaplotypeCaller -R {params.genome} -I {input.bam} -O {output} "
         "--dragen-mode true --dragstr-params-path {input.dragstr_params} "
-        "--native-pair-hmm-threads {threads}"
+        "--native-pair-hmm-threads {threads} --intervals {params.interval_list}"
 
 rule hardfilter:
     input:
@@ -122,7 +122,8 @@ rule hardfilter:
 
 rule vep:
     input:
-        vcf="vcf/hardfiltered/{sample}.hardfiltered.vcf", 
+        "vcf/hardfiltered/{sample}.hardfiltered.vcf"
+    params:
         genome="resources/genome/Homo_sapiens_assembly38_masked.fasta"
     output:
         out_vcf="vcf/vep/{sample}.vep.vcf",
@@ -130,12 +131,12 @@ rule vep:
     conda:
         "envs/vep.yaml"
     shell:
-        "vep -i {input.vcf} --output_file {output.out_vcf} "
+        "vep -i {input} --output_file {output.out_vcf} "
         "--stats_file {output.report} --cache --vcf "
         "--dir_cache resources/vep_cache " 
         "--species 'homo_sapiens' --force_overwrite "
         "--af --max_af --af_1kg --af_gnomad "
-        "--fasta {input.genome} --hgvs --hgvsg --offline --minimal "
+        "--fasta {params.genome} --hgvs --hgvsg --offline --minimal "
         "--custom resources/vep_cache/ClinVar/"
         "clinvar.vcf.gz,ClinVar,vcf,exact,0,ClinVar,vcf,exact,0,AF_ESP,AF_EXAC,"
         "AF_TGP,ALLELEID,CLNDN,CLNDNINCL,CLNDISDB,CLNDISDBINCL,CLNHGVS,CLNREVSTAT,"
@@ -147,14 +148,15 @@ rule vep:
 
 rule spliceai:
     input:
+        "vcf/vep/{sample}.vep.vcf"
+    params:
         genome="resources/genome/Homo_sapiens_assembly38_masked.fasta",
-        vcf="vcf/vep/{sample}.vep.vcf"
     output:
         "vcf/spliceai/{sample}.spliceai.vcf"
     conda:
         "envs/spliceai.yaml"
     shell:
-        "spliceai -I {input.vcf} -O {output} -R {input.genome} -A grch38"
+        "spliceai -I {input} -O {output} -R {params.genome} -A grch38"
 
 rule variantstotable:
     input:
@@ -169,29 +171,26 @@ rule variantstotable:
         "-GF AD -GF DP -GF GP -GF GQ -GF GT -GF PG -GF PL -F AC -F AF -F AN "
         "-F BaseQRankSum -F DP -F DRAGstrInfo -F DRAGstrParams -F ExcessHet "
         "-F FS -F InbreedingCoeff -F MLEAC -F MLEAF -F MQ -F MQRankSum -F QD "
-        "-F ReadPosRankSum -F SOR -F CSQ "
+        "-F ReadPosRankSum -F SOR -F CSQ -F SpliceAI"
 
 rule finis:
     input:
         tsv="vcf/tsv/{sample}.tsv"
     params:
         gnomadcsv=config["gnomad_v3.1.2_csv"],
-        csq_heads=config["csq"],
-        filters=config["filter_tags"]
     output:
-        directory("results/called_variants/{sample}/")
+        directory("results/called_variants/{sample}")
     conda:
         "envs/finis.yaml"
     shell:
         "python3 resources/finis/finis/finis.py "
         "--vcf_tsv {input.tsv} --gnomadCSV {params.gnomadcsv} "
-        "--csq_headers {params.csq_heads} --filter_tags {params.filters} "
-        "--output {output}"
+        "--out {output}/{wildcards.sample}"
 
 rule multiqc:
     input:
-        expand("results/called_variants/{sample}/{sample}_gnomadAnnotated.csv", 
-               sample = sample_names)
+        expand("results/called_variants/{sample}", 
+               sample=sample_names)
     output:
         "multiqc_report.html"
     conda:
