@@ -165,6 +165,8 @@ def parse_splice_predictions(vcfdf, gene_names):
         #      GCTCTCTCTCT|SLC25A13|0.00|0.00|0.00|0.00|-12|-45|48|-45
         row_high_scores = []
         try:
+            if pd.isnull(vcfdf.loc[index, "SpliceAI"]):
+                continue
             variant_records = vcfdf.loc[index, "SpliceAI"].split(",")
             for record_set in variant_records:
                 record = record_set.split("|")
