@@ -18,12 +18,14 @@ from logging import error
 from logging import DEBUG
 from numpy import nan
 import pandas as pd
+from pathlib import Path
 import plotly.express as px
 import sys
 
 PROGRAM_NAME = "finis"
 FILTER_TAG_KEY_ERROR = 1
 FILTER_TAG_VALUE_ERROR = 2
+UNEXPECTED_AF_HKG = 3
 
 def init_logging(log_filename):
     """If the log_filename is defined, then
@@ -38,10 +40,10 @@ def init_logging(log_filename):
     """
     if log_filename is not None:
         basicConfig(filename=log_filename,
-                            level=DEBUG,
-                            filemode="w",
-                            format="%(asctime)s %(levelname)s - %(message)s",
-                            datefmt="%Y-%m-%dT%H:%M:%S%z")
+                             level=DEBUG,
+                             filemode="w",
+                             format="%(asctime)s %(levelname)s - %(message)s",
+                             datefmt="%Y-%m-%dT%H:%M:%S%z")
         info("program started")
         info("command line: %s", " ".join(sys.argv))
 
@@ -64,6 +66,11 @@ def parse_args():
     """
     parser = ArgumentParser(description = "Annotates a VCF using gNOMAD gene-" +\
                                           "specific data")
+    parser.add_argument("--sample_name",
+                        type = str,
+                        required = True,
+                        help = "Sample name derived from file prefix in " +\
+                               "Snakemake pipeline")
     parser.add_argument("--gnomadCSV",
                         type = str,
                         required = True,
@@ -77,12 +84,18 @@ def parse_args():
                                "VariantsToTable")
     parser.add_argument("--csq_headers",
                         type = str,
-                        default = "Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|MINIMISED|SYMBOL_SOURCE|HGNC_ID|SOURCE|HGVS_OFFSET|HGVSg|AF|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|gnomAD_AF|gnomAD_AFR_AF|gnomAD_AMR_AF|gnomAD_ASJ_AF|gnomAD_EAS_AF|gnomAD_FIN_AF|gnomAD_NFE_AF|gnomAD_OTH_AF|gnomAD_SAS_AF|MAX_AF|MAX_AF_POPS|CLIN_SIG|SOMATIC|PHENO|ClinVar|ClinVar_ClinVar|ClinVar_vcf|ClinVar_exact|ClinVar_0|ClinVar_AF_ESP|ClinVar_AF_EXAC|ClinVar_AF_TGP|ClinVar_ALLELEID|ClinVar_CLNDN|ClinVar_CLNDNINCL|ClinVar_CLNDISDB|ClinVar_CLNDISDBINCL|ClinVar_CLNHGVS|ClinVar_CLNREVSTAT|ClinVar_CLNSIG|ClinVar_CLNSIGCONF|ClinVar_CLNSIGINCL|ClinVar_CLNVC|ClinVar_CLNVCSO|ClinVar_CLNVI|ClinVar_DBVARID|ClinVar_GENEINFO|ClinVar_MC|ClinVar_ORIGIN|ClinVar_RS|ClinVar_SSR|NARD|NARD_AF|NARD_AF_MNG|NARD_AF_KOR|NARD_AF_JPN|NARD_AF_CHN|NARD_AF_HKG",
+                        default = 
+                        "Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|MINIMISED|SYMBOL_SOURCE|HGNC_ID|SOURCE|HGVS_OFFSET|HGVSg|AF|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|gnomAD_AF|gnomAD_AFR_AF|gnomAD_AMR_AF|gnomAD_ASJ_AF|gnomAD_EAS_AF|gnomAD_FIN_AF|gnomAD_NFE_AF|gnomAD_OTH_AF|gnomAD_SAS_AF|MAX_AF|MAX_AF_POPS|CLIN_SIG|SOMATIC|PHENO|ClinVar|ClinVar_ClinVar|ClinVar_vcf|ClinVar_exact|ClinVar_0|ClinVar_AF_ESP|ClinVar_AF_EXAC|ClinVar_AF_TGP|ClinVar_ALLELEID|ClinVar_CLNDN|ClinVar_CLNDNINCL|ClinVar_CLNDISDB|ClinVar_CLNDISDBINCL|ClinVar_CLNHGVS|ClinVar_CLNREVSTAT|ClinVar_CLNSIG|ClinVar_CLNSIGCONF|ClinVar_CLNSIGINCL|ClinVar_CLNVC|ClinVar_CLNVCSO|ClinVar_CLNVI|ClinVar_DBVARID|ClinVar_GENEINFO|ClinVar_MC|ClinVar_ORIGIN|ClinVar_RS|ClinVar_SSR|NARD|NARD_AF|NARD_AF_MNG|NARD_AF_KOR|NARD_AF_JPN|NARD_AF_CHN|NARD_AF_HKG",
                         help = "INFO field for VEP's CSQ, e.g. " +\
                                "'Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|Existing_variation|ALLELE_NUM|DISTANCE|STRAND|FLAGS|MINIMISED|SYMBOL_SOURCE|HGNC_ID|SOURCE|HGVS_OFFSET|HGVSg|AF|AFR_AF|AMR_AF|EAS_AF|EUR_AF|SAS_AF|gnomAD_AF|gnomAD_AFR_AF|gnomAD_AMR_AF|gnomAD_ASJ_AF|gnomAD_EAS_AF|gnomAD_FIN_AF|gnomAD_NFE_AF|gnomAD_OTH_AF|gnomAD_SAS_AF|MAX_AF|MAX_AF_POPS|CLIN_SIG|SOMATIC|PHENO|ClinVar|ClinVar_ClinVar|ClinVar_vcf|ClinVar_exact|ClinVar_0|ClinVar_AF_ESP|ClinVar_AF_EXAC|ClinVar_AF_TGP|ClinVar_ALLELEID|ClinVar_CLNDN|ClinVar_CLNDNINCL|ClinVar_CLNDISDB|ClinVar_CLNDISDBINCL|ClinVar_CLNHGVS|ClinVar_CLNREVSTAT|ClinVar_CLNSIG|ClinVar_CLNSIGCONF|ClinVar_CLNSIGINCL|ClinVar_CLNVC|ClinVar_CLNVCSO|ClinVar_CLNVI|ClinVar_DBVARID|ClinVar_GENEINFO|ClinVar_MC|ClinVar_ORIGIN|ClinVar_RS|ClinVar_SSR|NARD|NARD_AF|NARD_AF_MNG|NARD_AF_KOR|NARD_AF_JPN|NARD_AF_CHN|NARD_AF_HKG'")
     parser.add_argument("--filter_tags",
                         nargs = "+",
-                        required = True,
+                        default = ["ClinVar_CLNSIG=='Likely pathogenic'", "ClinVar_CLNSIG=='Pathogenic'", 
+                                   "ClinVar_CLNSIG=='Conflicting_interpretations_of_pathogenicity'", 
+                                   "EAS_AF < 0.01", "gnomAD_AF < 0.01", "gnomAD_EAS_AF < 0.01", 
+                                   "Allele_Frequency < 0.01", "Allele_Frequency_East_Asian < 0.01", "NARD_AF < 0.01", 
+                                   "NARD_AF_MNG < 0.01", "NARD_AF_KOR < 0.01", "NARD_AF_JPN < 0.01", "NARD_AF_CHN < 0.01", 
+                                   "NARD_AF_HKG < 0.01", "SpliceAI_highest_score >= 0.05"],
                         help = """
                         Filtering criteria in string format.
                         
@@ -100,6 +113,30 @@ def parse_args():
                             ClinVar: "ClinVar_CLNSIG == 'Likely pathogenic' or ClinVar_CLNSIG == 'Pathogenic'"
                             Combined: --filter_tags "\`Allele Frequency East Asian\` < 0.01" "`Allele Frequency East Asian` == @nan" "CLNSIG == 'Likely pathogenic' or CLNSIG == 'Pathogenic'"
                         """)
+    parser.add_argument("--columns",
+                         nargs = "+",
+                         default =\
+     ["SYMBOL", "Gene", "Chromosome", "Position", "Reference", "Alternate", 
+      "STRAND", "X%$#*&.GT", "MQ", "MQRankSum", "rsIDs", "Existing_variation", 
+      "HGNC_ID",  "ClinVar_RS", "ClinVar_Variation_ID", "Feature_type", 
+      "Transcript", "Consequence", "VEP_Annotation", "HGVS_Consequence", 
+      "Protein_Consequence" , "Transcript_Consequence", "HGVSg", "HGVSc", 
+      "HGVSp", "Feature", "BIOTYPE", "EXON", "INTRON",  "CLIN_SIG", 
+      "ClinVar_CLNSIG", "ClinVar_Clinical_Significance", "ClinVar_ALLELEID", 
+      "ClinVar_CLNDN", "SpliceAI", "SpliceAI_highest_score", "ClinVar_AF_ESP", 
+      "ClinVar_AF_EXAC", "ClinVar_AF_TGP", "NARD_AF", "NARD_AF_MNG", 
+      "NARD_AF_KOR", "NARD_AF_JPN", "NARD_AF_CHN", "NARD_AF_HKG", "AF", "AFR_AF", 
+      "AMR_AF", "EAS_AF", "EUR_AF", "SAS_AF", "gnomAD_AF", "gnomAD_AFR_AF", 
+      "gnomAD_AMR_AF", "gnomAD_ASJ_AF", "gnomAD_EAS_AF", "gnomAD_FIN_AF", 
+      "gnomAD_NFE_AF", "gnomAD_OTH_AF", "gnomAD_SAS_AF", "Allele_Frequency", 
+      "Allele_Frequency_Other", "Allele_Frequency_Latino/Admixed_American",
+      "Allele_Frequency_European_(Finnish)", "Allele_Frequency_Amish", 
+      "Allele_Frequency_East_Asian", "Allele_Frequency_Middle_Eastern", 
+      "Allele_Frequency_African/African_American", 
+      "Allele_Frequency_South_Asian", "Allele_Frequency_Ashkenazi_Jewish",
+      "Allele_Frequency_European_(non-Finnish)"],
+                         help = "Columns to keep in cleaned output CSV. " + 
+                         "Will automatically replace 'X%$#*&' with sample name")
     parser.add_argument("--out",
                         type = str,
                         default = "out",
@@ -215,7 +252,7 @@ def parse_vcf(vcf_tsv, csq):
     vcfdf = pd.concat([vcfdf, csq_df], axis = 1)
 
     # Parse SpliceAI and Pangolin columns
-    gene_names = vcfdf["GENE"].unique()
+    gene_names = vcfdf["SYMBOL"].unique()
     vcfdf = parse_splice_predictions(vcfdf, gene_names)
 
     # Change all blank cells into np.nan
@@ -245,19 +282,20 @@ def parse_gNOMAD(gnomadcsv):
     gnomadf = gnomadf.astype({"Chromosome": str, "Position" : int,
                               "Reference": str, "Alternate": str,
                               "Allele Count": int, "Allele Number": int})
+    gnomadf.columns = gnomadf.columns.str.replace(" ", "_")
     return gnomadf
 
 def update_allele_freq(gnomadf):
     """
     Calculates allele frequency for every population and add them as new columns
     """
-    population_list = ["Other", "Latino/Admixed American", "European (Finnish)",
-                       "Amish", "East Asian", "Middle Eastern", "South Asian",
-                       "African/African American", "Ashkenazi Jewish",
-                       "European (non-Finnish)"]
+    population_list = ["Other", "Latino/Admixed_American", "European_(Finnish)",
+                       "Amish", "East_Asian", "Middle_Eastern", "South_Asian",
+                       "African/African_American", "Ashkenazi_Jewish",
+                       "European_(non-Finnish)"]
     for pop in population_list:
-        gnomadf[f"Allele Frequency {pop}"] = \
-            gnomadf[f"Allele Count {pop}"]/ gnomadf[f"Allele Number {pop}"]
+        gnomadf[f"Allele_Frequency_{pop}"] = \
+            gnomadf[f"Allele_Count_{pop}"]/ gnomadf[f"Allele_Number_{pop}"]
     return gnomadf
 
 def merge(vcfdf, gnomadf):
@@ -274,44 +312,44 @@ def merge(vcfdf, gnomadf):
     gnomadOut : TYPE Pandas dataframe
         DESCRIPTION. Entries found in both vcf and gNOMAD
     """
-    gnomadgenome_col = ["Chromosome", "Position","Reference","Alternate",
-                        "rsIDs","Source","Filters - exomes","Filters - genomes",
-                        "Transcript","HGVS Consequence","Protein Consequence",
-                        "Transcript Consequence","VEP Annotation",
-                        "ClinVar Clinical Significance","ClinVar Variation ID",
-                        "Flags","Allele Count","Allele Number","Allele Frequency",
-                        "Homozygote Count","Hemizygote Count","Allele Count Other",
-                        "Allele Number Other","Homozygote Count Other",
-                        "Hemizygote Count Other",
-                        "Allele Count Latino/Admixed American",
-                        "Allele Number Latino/Admixed American",
-                        "Homozygote Count Latino/Admixed American",
-                        "Hemizygote Count Latino/Admixed American",
-                        "Allele Count European (Finnish)",
-                        "Allele Number European (Finnish)",
-                        "Homozygote Count European (Finnish)",
-                        "Hemizygote Count European (Finnish)",
-                        "Allele Count Amish","Allele Number Amish",
-                        "Homozygote Count Amish","Hemizygote Count Amish",
-                        "Allele Count East Asian","Allele Number East Asian",
-                        "Homozygote Count East Asian","Hemizygote Count East Asian",
-                        "Allele Count Middle Eastern","Allele Number Middle Eastern",
-                        "Homozygote Count Middle Eastern","Hemizygote Count Middle Eastern",
-                        "Allele Count African/African American",
-                        "Allele Number African/African American",
-                        "Homozygote Count African/African American",
-                        "Hemizygote Count African/African American",
-                        "Allele Count South Asian","Allele Number South Asian",
-                        "Homozygote Count South Asian","Hemizygote Count South Asian",
-                        "Allele Count Ashkenazi Jewish","Allele Number Ashkenazi Jewish",
-                        "Homozygote Count Ashkenazi Jewish","Hemizygote Count Ashkenazi Jewish",
-                        "Allele Count European (non-Finnish)","Allele Number European (non-Finnish)",
-                        "Homozygote Count European (non-Finnish)","Hemizygote Count European (non-Finnish)",
-                        "Allele Frequency Other", "Allele Frequency Latino/Admixed American",
-                        "Allele Frequency European (Finnish)", "Allele Frequency Amish", "Allele Frequency East Asian",
-                        "Allele Frequency Middle Eastern","Allele Frequency African/African American", 
-                        "Allele Frequency South Asian","Allele Frequency Ashkenazi Jewish", 
-                        "Allele Frequency European (non-Finnish)"]
+    gnomadgenome_col = ["Chromosome","Position","Reference","Alternate",
+                        "rsIDs","Source","Filters_-_exomes","Filters_-_genomes",
+                        "Transcript","HGVS_Consequence","Protein_Consequence",
+                        "Transcript_Consequence","VEP_Annotation",
+                        "ClinVar_Clinical_Significance","ClinVar_Variation_ID",
+                        "Flags","Allele_Count","Allele_Number","Allele_Frequency",
+                        "Homozygote_Count","Hemizygote_Count","Allele_Count_Other",
+                        "Allele_Number_Other","Homozygote_Count_Other",
+                        "Hemizygote_Count_Other",
+                        "Allele_Count_Latino/Admixed_American",
+                        "Allele_Number_Latino/Admixed_American",
+                        "Homozygote_Count_Latino/Admixed_American",
+                        "Hemizygote_Count_Latino/Admixed_American",
+                        "Allele_Count_European_(Finnish)",
+                        "Allele_Number_European_(Finnish)",
+                        "Homozygote_Count_European_(Finnish)",
+                        "Hemizygote_Count_European_(Finnish)",
+                        "Allele_Count_Amish","Allele_Number_Amish",
+                        "Homozygote_Count_Amish","Hemizygote_Count_Amish",
+                        "Allele_Count_East_Asian","Allele_Number_East_Asian",
+                        "Homozygote_Count_East_Asian","Hemizygote_Count_East_Asian",
+                        "Allele_Count_Middle_Eastern","Allele_Number_Middle_Eastern",
+                        "Homozygote_Count_Middle_Eastern","Hemizygote_Count_Middle_Eastern",
+                        "Allele_Count_African/African_American",
+                        "Allele_Number_African/African_American",
+                        "Homozygote_Count_African/African_American",
+                        "Hemizygote_Count_African/African_American",
+                        "Allele_Count_South_Asian","Allele_Number_South_Asian",
+                        "Homozygote_Count_South_Asian","Hemizygote_Count_South_Asian",
+                        "Allele_Count_Ashkenazi_Jewish","Allele_Number_Ashkenazi_Jewish",
+                        "Homozygote_Count_Ashkenazi_Jewish","Hemizygote_Count_Ashkenazi_Jewish",
+                        "Allele_Count_European_(non-Finnish)","Allele_Number_European_(non-Finnish)",
+                        "Homozygote_Count_European_(non-Finnish)","Hemizygote_Count_European_(non-Finnish)",
+                        "Allele_Frequency_Other","Allele_Frequency_Latino/Admixed_American",
+                        "Allele_Frequency_European_(Finnish)","Allele_Frequency_Amish","Allele_Frequency_East_Asian",
+                        "Allele_Frequency_Middle_Eastern","Allele_Frequency_African/African_American",
+                        "Allele_Frequency_South_Asian","Allele_Frequency_Ashkenazi_Jewish",
+                        "Allele_Frequency_European_(non-Finnish)"]
     merged_df = pd.merge(vcfdf,
                          gnomadf[gnomadgenome_col],
                          on = ["Chromosome", "Position", 
@@ -323,22 +361,33 @@ def AF_to_numeric(merged_df):
     """
     Changes all allele frequency fields to numeric type
     """
-    merged_df["NARD_AF_HKG"] = merged_df["NARD_AF_HKG"].str.split(",")\
-                               .map(lambda x: float(x[0]))
+    for index, row in merged_df.iterrows():
+        if pd.isnull(merged_df.loc[index, "NARD_AF_HKG"]):
+            pass
+        else:
+            value = merged_df.loc[index, "NARD_AF_HKG"].split(",")[0]
+            if value:
+                merged_df.loc[index, "NARD_AF_HKG"] = float(value.split(",")[0])
+            elif value == '':
+                merged_df.loc[index, "NARD_AF_HKG"] = nan
+            else:
+                exit_with_error("Unexpected NARD_AF_HKG allele frequency type",
+                                UNEXPECTED_AF_HKG)
     AF = ["AFR_AF", "AMR_AF", "EAS_AF", "EUR_AF", "SAS_AF", "NARD_AF",
-          "NARD_AF_MNG", "NARD_AF_KOR", "NARD_AF_JPN" "NARD_AF_CHN", 
+          "NARD_AF_MNG", "NARD_AF_KOR", "NARD_AF_JPN", "NARD_AF_CHN", 
           "NARD_AF_HKG", "gnomAD_AF", "gnomAD_AFR_AF", "gnomAD_AMR_AF", 
           "gnomAD_ASJ_AF", "gnomAD_EAS_AF", "gnomAD_FIN_AF", "gnomAD_NFE_AF", 
-          "gnomAD_OTH_AF", "gnomAD_SAS_AF", "Allele Frequency European (Finnish)", 
-          "Allele Frequency Amish",  "Allele Frequency East Asian",
-          "Allele Frequency Middle Eastern", "Allele Frequency South Asian"
-          "Allele Frequency African/African American", 
-          "Allele Frequency Ashkenazi Jewish", 
-          "Allele Frequency European (non-Finnish)"]
+          "gnomAD_OTH_AF", "gnomAD_SAS_AF", "Allele_Frequency_European_(Finnish)", 
+          "Allele_Frequency_Amish",  "Allele_Frequency_East_Asian",
+          "Allele_Frequency_Middle_Eastern", "Allele_Frequency_South_Asian",
+          "Allele_Frequency_African/African_American", 
+          "Allele_Frequency_Ashkenazi_Jewish", 
+          "Allele_Frequency_European_(non-Finnish)"]
     try:
         merged_df[AF] = merged_df[AF].apply(pd.to_numeric)
     except:
         info("WARNING: Allele frequency dtype changing has failed.")
+    
     return merged_df
         
 def filter_tsv(naf_merged_df, filter_tag):
@@ -377,7 +426,11 @@ def csv_out(merged_df, out):
     
     Also output gNOMAD genome csv if allele frequency is updated
     """
-    merged_df.to_csv(f"{out}_gnomadAnnotated.csv", index = False)
+    merged_df.to_csv(f"{out}.csv", index = False)
+
+def clean_csv(df, columns):
+    df = df[columns]
+    return df
 
 def plot(df, filter_name, out): 
     df["Consequence"] = df["Consequence"].replace(nan, "None")
@@ -393,12 +446,18 @@ def main():
     args = parse_args()
     
     # Parse remaining command-line arguments
+    sample_name = args.sample_name
     gnomadcsv = args.gnomadCSV
     vcf_tsv = args.vcf_tsv
     filter_tags = args.filter_tags
     out = args.out
     csq = args.csq_headers
+    clean_columns = args.columns
+    clean_columns = [x.replace("X%$#*&", sample_name) for x in clean_columns]
     
+    # Make output directory
+    Path(out).mkdir(parents=True, exist_ok=True)
+
     # Initiate logging
     init_logging(f"{out}_logging.txt")
     
@@ -409,6 +468,9 @@ def main():
 
     # Write out raw csv
     csv_out(merged_df, f"{out}_raw")
+
+    # Write out clean csv
+    csv_out(clean_csv(merged_df.copy(), clean_columns), f"{out}_clean")
     
     # Plot raw
     plot(merged_df, "raw", out)
@@ -452,7 +514,8 @@ def main():
                 
         # Write out filtered csv
         plot(total_filtered_df, "filtered", out)
-        csv_out(total_filtered_df, f"{out}_gnomadAnnotated.csv")
+        csv_out(clean_csv(total_filtered_df, clean_columns), 
+                f"{out}_annotated_filtered.csv")
     
     info("Annotation complete")
     
