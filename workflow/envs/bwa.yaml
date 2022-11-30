@@ -1,0 +1,16 @@
+name: bwa
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1=conda_forge
+  - _openmp_mutex=4.5=2_gnu
+  - bwa=0.7.17=h7132678_9
+  - libgcc-ng=12.1.0=h8d9b700_16
+  - libgomp=12.1.0=h8d9b700_16
+  - libnsl=2.0.0=h7f98852_0
+  - libzlib=1.2.12=h166bdaf_3
+  - perl=5.32.1=2_h7f98852_perl5
+  - zlib=1.2.12=h166bdaf_3
+prefix: /home/weiyuan/miniconda3/envs/bwa
