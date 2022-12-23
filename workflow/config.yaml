@@ -1,0 +1,11 @@
+# Input files
+intervals_list: "bed/hg38_UCD_gene_regulatory.bed"
+
+# Read group information
+rgid: 4                 # Read group ID
+rglb: MiSeqV2-600cycles # Library method
+rgpl: ILLUMINA          # Platform
+rgpu: unit1             # Read group platform unit (e.g. run barcode)
+
+# Computational resource
+threads: 16
