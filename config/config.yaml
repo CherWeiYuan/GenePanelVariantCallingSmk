@@ -1,3 +1,0 @@
-intervals_list: "bed/hg38_UCD_gene_regulatory.bed"
-gnomad_v3.1.2_csv: "resources/finis/gNOMAD_v3.1.2/ABCA4_UCD_gnomad_v3.1.2.csv"
-threads: 48
