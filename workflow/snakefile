@@ -1,14 +1,17 @@
-# To run: snakemake --use-conda --retries 3 --cores all
-# To test: snakemake --use-conda --cores all
-# Dry run: snakemake -n
-# Re-run a rule and its downstream: 
-# snakemake --cores 5 --use-conda --resources mem_mb=20000
-# snakemake --forceall vep --cores 10 --use-conda
-# Caveats: 
-#   only for grch38 (fasta and spliceai setting)
-#   Nonmenclature: {sample}_R1_001.fastq.gz, {sample}_R2_001.fastq.gz
+# Snakemake variant calling pipeline for gene panel
+# snakemake --cores 10 --use-conda --resources mem_mb=20000 --retries 3
+
+# Important information
+#   Pipeline is engineered for GRCh38 reference genome
+#   Input files have the following nomenclature:
+#       Read 1: {sample_name}_R1_001.fastq.gz
+#       Read 2: {sample_name}_R2_001.fastq.gz
 
 configfile: "workflow/config.yaml"
+
+# Get working directory
+from os import getcwd
+working_directory = getcwd()
 
 # Get prefix of fastq files
 from os import listdir
@@ -29,152 +32,115 @@ rule all:
     input:
         "multiqc_report.html"
 
-rule fastp:
-    input:
-        read1="fastq/{sample}_R1_001.fastq.gz",
-        read2="fastq/{sample}_R2_001.fastq.gz"
-    output:
-        read1=temp("clean_fastq/clean_{sample}_R1_001.fastq.gz"),
-        read2=temp("clean_fastq/clean_{sample}_R2_001.fastq.gz"),
-        report="results/quality_control/{sample}.fastp.html",
-        json="results/quality_control/{sample}.fastp.json"
-    conda:
-        "envs/fastp.yaml"
-    threads:
-        config["threads"]
-    shell:
-        "fastp -i {input.read1} -I {input.read2} "
-        "-o {output.read1} -O {output.read2} "
-        "-h {output.report} -j {output.json} "
-        "--detect_adapter_for_pe --qualified_quality_phred 15 "
-        "--unqualified_percent_limit 40 --length_required 15 "
-        "--thread {threads}"
+# rule fastp:
+#     input:
+#         read1="fastq/{sample}_R1_001.fastq.gz",
+#         read2="fastq/{sample}_R2_001.fastq.gz"
+#     output:
+#         read1=temp("clean_fastq/clean_{sample}_R1_001.fastq.gz"),
+#         read2=temp("clean_fastq/clean_{sample}_R2_001.fastq.gz"),
+#         report="results/quality_control/{sample}.fastp.html",
+#         json="results/quality_control/{sample}.fastp.json"
+#     conda:
+#         "envs/fastp.yaml"
+#     threads:
+#         config["threads"]
+#     shell:
+#         "fastp -i {input.read1} -I {input.read2} "
+#         "-o {output.read1} -O {output.read2} "
+#         "-h {output.report} -j {output.json} "
+#         "--detect_adapter_for_pe --qualified_quality_phred 15 "
+#         "--unqualified_percent_limit 40 --length_required 15 "
+#         "--thread {threads}"
 
-rule bwa:
-    input:
-        read1="clean_fastq/clean_{sample}_R1_001.fastq.gz",
-        read2="clean_fastq/clean_{sample}_R2_001.fastq.gz"
-    params:
-        genome="resources/genome/Homo_sapiens_assembly38.fasta"
-    output:
-        temp("sam/{sample}.sam")
-    conda:
-        "envs/bwa.yaml"
-    threads:
-        config["threads"]
-    shell:
-        "bwa mem -t {threads} {params.genome} {input.read1} {input.read2} > "
-        "{output}"
+# rule bwa:
+#     input:
+#         read1="clean_fastq/clean_{sample}_R1_001.fastq.gz",
+#         read2="clean_fastq/clean_{sample}_R2_001.fastq.gz"
+#     params:
+#         genome="resources/genome/Homo_sapiens_assembly38.fasta"
+#     output:
+#         temp("sam/{sample}.sam")
+#     conda:
+#         "envs/bwa.yaml"
+#     threads:
+#         config["threads"]
+#     shell:
+#         "bwa mem -t {threads} {params.genome} {input.read1} {input.read2} > "
+#         "{output}"
 
-rule addreadgroup:
-    input:
-        "sam/{sample}.sam"
-    params:
-        rgid=config["rgid"],
-        rglb=config["rglb"],
-        rgpl=config["rgpl"],
-        rgpu=config["rgpu"]
-    output:
-        temp("sam/{sample}.RG.sam")
-    conda:
-        "envs/gatk4.yaml"
-    shell:
-        "gatk AddOrReplaceReadGroups "
-        "-I {input} -O {output} -RGID {params.rgid} -RGLB {params.rglb} "
-        "-RGPL {params.rgpl} -RGPU {params.rgpu} -RGSM {wildcards.sample}"
+# rule addreadgroup:
+#     input:
+#         "sam/{sample}.sam"
+#     params:
+#         rgid=config["rgid"],
+#         rglb=config["rglb"],
+#         rgpl=config["rgpl"],
+#         rgpu=config["rgpu"]
+#     output:
+#         temp("sam/{sample}.RG.sam")
+#     conda:
+#         "envs/gatk4.yaml"
+#     shell:
+#         "gatk AddOrReplaceReadGroups "
+#         "-I {input} -O {output} -RGID {params.rgid} -RGLB {params.rglb} "
+#         "-RGPL {params.rgpl} -RGPU {params.rgpu} -RGSM {wildcards.sample}"
 
-rule sortsam:
-    input:
-        "sam/{sample}.RG.sam"
-    output:
-        temp("bam/{sample}.sorted.bam")
-    conda:
-        "envs/samtools.yaml"
-    threads:
-         config["threads"]
-    shell:
-        "samtools sort -l 0 -o {output} -O BAM --threads {threads} {input}" 
+# rule sortsam:
+#     input:
+#         "sam/{sample}.RG.sam"
+#     output:
+#         temp("bam/{sample}.sorted.bam")
+#     conda:
+#         "envs/samtools.yaml"
+#     threads:
+#          config["threads"]
+#     shell:
+#         "samtools sort -l 0 -o {output} -O BAM --threads {threads} {input}" 
 
-rule markduplicates:
-    input:
-        "bam/{sample}.sorted.bam"
-    output:
-        bam="bam/{sample}.sorted.removed_duplicates.bam",
-        metrics="results/quality_control/markduplicates/{sample}.txt"
-    conda:
-        "envs/gatk4.yaml"
-    shell:
-        "gatk MarkDuplicates -I {input} -O {output.bam} "
-        "-M {output.metrics} --REMOVE_DUPLICATES "
-        "--REMOVE_SEQUENCING_DUPLICATES"
+# rule markduplicates:
+#     input:
+#         "bam/{sample}.sorted.bam"
+#     output:
+#         bam="bam/{sample}.sorted.removed_duplicates.bam",
+#         metrics="results/quality_control/markduplicates/{sample}.txt"
+#     conda:
+#         "envs/gatk4.yaml"
+#     shell:
+#         "gatk MarkDuplicates -I {input} -O {output.bam} "
+#         "-M {output.metrics} --REMOVE_DUPLICATES "
+#         "--REMOVE_SEQUENCING_DUPLICATES"
 
-rule bamindex:
-    input:
-        "bam/{sample}.sorted.removed_duplicates.bam"
-    output:
-        "bam/{sample}.sorted.removed_duplicates.bam.bai"
-    conda:
-        "envs/samtools.yaml"
-    shell:
-        "samtools index {input} {output}"
+# rule bamindex:
+#     input:
+#         "bam/{sample}.sorted.removed_duplicates.bam"
+#     output:
+#         "bam/{sample}.sorted.removed_duplicates.bam.bai"
+#     conda:
+#         "envs/samtools.yaml"
+#     shell:
+#         "samtools index {input} {output}"
 
-rule haplotypecaller:
+rule deepvariant:
     input:
         bam="bam/{sample}.sorted.removed_duplicates.bam",
         bai="bam/{sample}.sorted.removed_duplicates.bam.bai" 
     params: 
         genome="resources/genome/Homo_sapiens_assembly38.fasta",
-        interval_list=config["intervals_list"]
+        bed=config["intervals_list"]
     output:
-        "vcf/raw/{sample}.raw.vcf"
-    conda:
-        "envs/gatk4.yaml"
-    threads:
-        config["threads"]
+        outvcf="vcf/{sample}.dv.vcf"
     shell:
-        "gatk HaplotypeCaller -R {params.genome} -I {input.bam} -O {output} "
-        "--native-pair-hmm-threads {threads} --intervals {params.interval_list}"
-
-rule cnnscorevariants:
-    input:
-        bam="bam/{sample}.sorted.removed_duplicates.bam",
-        vcf="vcf/raw/{sample}.raw.vcf"
-    params:
-        genome="resources/genome/Homo_sapiens_assembly38.fasta"
-    output:
-        temp("vcf/raw/{sample}.cnn.vcf")   
-    threads:
-        config["threads"]
-    shell:
-        "docker run -v $(pwd):$(pwd) -w $(pwd) --rm -it broadinstitute/gatk:4.3.0.0 "
-        "gatk CNNScoreVariants -I {input.bam} -V {input.vcf} -R {params.genome} "
-        "-O {output} --inter-op-threads {threads} --intra-op-threads {threads} "
-        "--tensor-type read_tensor"
-
-rule filtervariant:
-    input:
-        "vcf/raw/{sample}.cnn.vcf"
-    params:
-        mills="resources/genome/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz",
-        hap="resources/genome/hapmap_3.3.hg38.vcf.gz",
-        ph1="resources/genome/1000G_phase1.snps.high_confidence.hg38.vcf.gz"
-    output:
-        temp("vcf/{sample}.filtered.vcf")
-    conda:
-        "envs/gatk4.yaml"
-    shell:
-        "gatk FilterVariantTranches -V {input} -O {output} "
-        "--resource {params.mills} "
-        "--resource {params.hap} "
-        "--resource {params.ph1} "
-        "--info-key CNN_2D "
-        "--snp-tranche 99.95 "
-        "--indel-tranche 99.4 "
-        "--invalidate-previous-filters"
+        "docker run -v '{working_directory}:/input' "
+        "-v '{working_directory}:/output' "
+        "google/deepvariant:1.4.0 /opt/deepvariant/bin/run_deepvariant "
+        "--model_type=WGS --ref=/input/{params.genome} "
+        "--reads=/input/{input.bam} --output_vcf=/output/{output} "
+        "--regions=/input/{params.bed} --num_shards={workflow.cores}"
 
 rule spliceai:
     input:
-        "vcf/{sample}.filtered.vcf"
+        "vcf/{sample}.dv.vcf"
     params:
         genome="resources/genome/Homo_sapiens_assembly38.fasta"
     output:
@@ -182,11 +148,11 @@ rule spliceai:
     conda:
         "envs/spliceai.yaml"
     shell:
-        "spliceai -I {input} -O {output} -R {params.genome} -A grch38"
+        "spliceai -I {input} -O {output} -R {params.genome} -A grch38 -M 1"
 
 rule bgzip_spliceai:
     input:
-        "vcf/pangolin/{sample}.spliceai.vcf"
+        "vcf/spliceai/{sample}.spliceai.vcf"
     output:
         "vcf/spliceai/{sample}.spliceai.vcf.gz",
     conda:
@@ -254,7 +220,3 @@ rule multiqc:
 
 onsuccess:
     print("Workflow finished, no error")
-
-onerror:
-    print("An error occurred")
-    shell("mail -s 'an error occurred' {config['email']} < {log}")
