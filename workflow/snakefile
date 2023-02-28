@@ -132,7 +132,7 @@ rule deepvariant:
         outvcf="vcf/{sample}.dv.vcf"
     threads: 1
     shell:
-        "docker run -v '{working_directory}:/input' "
+        "docker run --rm -v '{working_directory}:/input' "
         "-v '{working_directory}:/output' "
         "google/deepvariant:1.4.0 /opt/deepvariant/bin/run_deepvariant "
         "--model_type=WGS --ref=/input/{params.genome} "
