@@ -1,7 +1,7 @@
 # Snakemake Gene Panel Variant Calling Pipeline
 
 ## Set up Snakemake
-mamba create --name snakemake -c bioconda -y snakemake
+```mamba create --name snakemake -c bioconda -y snakemake```
 
 ## Set up Snakemake directory
 ```
@@ -38,3 +38,10 @@ curl -O https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar.vcf.gz.md5
 curl -o GenePanelVariantCallingSmk/resources/vep_cache/homo_sapiens_vep_108_GRCh38.tar.gz \
 ftp://ftp.ensembl.org/pub/release-108/variation/indexed_vep_cache/homo_sapiens_vep_108_GRCh38.tar.gz
 tar xzf GenePanelVariantCallingSmk/resources/vep_cache/homo_sapiens_vep_108_GRCh38.tar.gz
+```
+
+## To run pipeline
+Using 10 cores and max memory of 20 GB
+```
+snakemake --cores 10 --use-conda --resources mem_mb=20000 --retries 3
+```
