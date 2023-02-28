@@ -40,8 +40,42 @@ ftp://ftp.ensembl.org/pub/release-108/variation/indexed_vep_cache/homo_sapiens_v
 tar xzf GenePanelVariantCallingSmk/resources/vep_cache/homo_sapiens_vep_108_GRCh38.tar.gz
 ```
 
-## To run pipeline
-Using 10 cores and max memory of 20 GB
+## Run pipeline
+Important notes:
+* Input are paired-end fastq files in the file name format: 
+  - Read 1 as {sample_name}_R1_001.fastq.gz
+  - Read 2 as {sample_name}_R2_001.fastq.gz
+* Reads will be mapped to GRCh38 reference genome
+
+Using 4 cores and max memory of 10 GB
 ```
-snakemake --cores 10 --use-conda --resources mem_mb=20000 --retries 3
+snakemake --cores 4 --use-conda --resources mem_mb=10000 --retries 3
 ```
+
+## Output
+Output will be sent to "results" folder in the working directory.
+There are two output folders: "all_data" and "simplified_data"
+
+Generally, the CSV reports in "simplified_data" will suffice:\
+
+| **Header**        | **Description**     |
+|:------------:|:---------------------------------------|
+| ```HGVSg```       | HGVS genomic      |
+|```HGVSc```        | HGVS coding       |
+|```HGVSp```        | HGVS protein      |
+|```SYMBOL```       | Gene name         |
+|```Gene```         | ENSEMBL gene ID   |
+|```Existing_variation```| Variant ID, most frequently rsID |
+|```Feature``` | ENSEMBL feature ID     |
+|```Feature_type``` | Feature type, such as Transcript or Regulatory Feature|
+|```Consequence```	| VEP calculated consequence, such as frameshift_variant, intron_variant, start_loss, missense_variant, intron_variant or stop_gained |
+|```AF``` | Global allele frequency|
+|```EAS_AF``` | East Asian allele frequency |
+|```gnomADe_AF```  | gNOMAD v2.1 exome (WES) population database allele frequency   |
+|```gnomADe_EAS_AF```   | gNOMAD v2.1 exome (WES) population database allele frequency for East Asians  |
+|```gnomADg_AF``` | gNOMAD v3.2.1 genome (WGS) population database allele frequency |
+|```gnomADg_EAS_AF```   | gNOMAD v3.2.1 genome (WGS) population database allele frequency for East Asians    |
+|```ClinVar_CLNSIG```	  | ClinVar clinical significance, such as Pathogenic, Likely_pathogenic or Conflicting_interpretations_of_pathogenicity   |
+|```SpliceAI_SpliceAI_highest_score``` | SpliceAI score, define as the highest delta score among the four categories: acceptor gain/ loss, donor gain/loss|
+
+Should more information be required, "all_data" folder will provide a comprehensive report for each sample
