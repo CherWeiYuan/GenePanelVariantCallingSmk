@@ -89,7 +89,7 @@ def parse_splice_predictions(vcfdf, column_name):
     """
     # Replace cells with "-" as nan
     vcfdf.replace({"-": nan}, inplace = True)
-    vcfdf[column_name + "_highest_score"] = 0
+    vcfdf[column_name + "_highest_score"] = nan
     for index, row in vcfdf.iterrows():
         ## Processing SpliceAI column
         # Each row in SpliceAI column contains one SpliceAI record set per 
@@ -156,15 +156,9 @@ def main():
             "HGVSc",
             "HGVSp",
             "SYMBOL",
-            "Gene",
+            "ZYG",
             "Existing_variation",
-            "Feature",
-            "Feature_type",
             "Consequence",
-            "AF",
-            "EAS_AF",
-            "gnomADe_AF",
-            "gnomADe_EAS_AF",
             "gnomADg_AF",
             "gnomADg_EAS_AF",
             "ClinVar_CLNSIG",
