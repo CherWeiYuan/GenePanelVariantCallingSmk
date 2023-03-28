@@ -206,6 +206,8 @@ rule finis:
     output:
         full="results/variants/all_data/{sample}.full.csv",
         simple="results/variants/simplified_data/{sample}.simple.csv"
+    conda:
+        "envs/finis.yaml"
     shell:
         "python3 resources/finis/finis.py --vcf_tsv {input} "
         "--out_full {output.full} --out_simple {output.simple}"
