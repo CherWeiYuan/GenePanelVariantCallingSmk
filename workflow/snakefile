@@ -148,7 +148,7 @@ rule spliceai:
     output:
         "vcf/spliceai/{sample}.spliceai.vcf"
     conda:
-        "envs/spliceai.yaml"
+        "envs/spliceai_gpu.yaml"
     shell:
         "spliceai -I {input} -O {output} -R {params.genome} -A grch38 -M 1"
 
