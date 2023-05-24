@@ -109,26 +109,24 @@ def parse_splice_predictions(vcfdf, column_name):
         #      GCTCTCTCTCT|SLC25A13|0.00|0.00|0.00|0.00|-12|-45|48|-45
         row_high_scores = []
         gene_name = vcfdf.loc[index, "SYMBOL"]
-        try:
-            if dd.isnull(vcfdf.loc[index, column_name]):
+        
+        # Skip loop if SpliceAI is nan
+        if type(vcfdf.loc[index, column_name]) == float:
+            continue
+        variant_records = vcfdf.loc[index, column_name].split(",")
+        for record_set in variant_records:
+            record = record_set.split("|")
+            # Ensure highest score for each row is for the correct gene
+            if record[1] != gene_name:
                 continue
-            variant_records = vcfdf.loc[index, column_name].split(",")
-            for record_set in variant_records:
-                record = record_set.split("|")
-                # Ensure highest score for each row is for the correct gene
-                if record[1] != gene_name:
-                    continue
-                row_high_scores += [max([str_to_numeric(record[2]),   
-                                        # DS_AG score (acceptor gain)
-                                        str_to_numeric(record[3]),   
-                                        # DS_AL score (acceptor loss)
-                                        str_to_numeric(record[4]),   
-                                        # DS_DG score (donor gain)
-                                        str_to_numeric(record[5])])] 
-                                        # DS_DL score (donor loss)
-        # Catch error when SpliceAI entry is nan
-        except AttributeError:
-            pass
+            row_high_scores += [max([str_to_numeric(record[2]),   
+                                    # DS_AG score (acceptor gain)
+                                    str_to_numeric(record[3]),   
+                                    # DS_AL score (acceptor loss)
+                                    str_to_numeric(record[4]),   
+                                    # DS_DG score (donor gain)
+                                    str_to_numeric(record[5])])] 
+                                    # DS_DL score (donor loss)
 
         if row_high_scores:
             vcfdf.loc[index, column_name + "_highest_score"] = max(row_high_scores)
