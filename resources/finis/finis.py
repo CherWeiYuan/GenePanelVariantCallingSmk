@@ -12,7 +12,7 @@ tags and cleans & plot the final output
 """
 
 from argparse import ArgumentParser, BooleanOptionalAction
-import dask.dataframe as dd
+import pandas as pd
 from numpy import nan
 import sys
 
@@ -96,8 +96,6 @@ def parse_splice_predictions(vcfdf, column_name):
     Parse SpliceAI scores
     Store highest score obtained per variant across all score categories
     """
-    # Replace cells with "-" as nan
-    vcfdf.replace({"-": nan}, inplace = True)
     vcfdf[column_name + "_highest_score"] = nan
     for index, row in vcfdf.iterrows():
         ## Processing SpliceAI column
@@ -109,13 +107,11 @@ def parse_splice_predictions(vcfdf, column_name):
         #      GCTCTCTCTCT|SLC25A13|0.00|0.00|0.00|0.00|-12|-45|48|-45
         row_high_scores = []
         gene_name = vcfdf.loc[index, "SYMBOL"]
-        
-        # Skip loop if SpliceAI is nan
         if type(vcfdf.loc[index, column_name]) == float:
             continue
-        variant_records = vcfdf.loc[index, column_name].split(",")
+        variant_records = str(vcfdf.loc[index, column_name]).split(",")
         for record_set in variant_records:
-            record = record_set.split("|")
+            record = str(record_set).split("|")
             # Ensure highest score for each row is for the correct gene
             if record[1] != gene_name:
                 continue
@@ -148,18 +144,22 @@ def main():
     
     # Load dataframes and remove lines starting with double hex
     removeComments(vcf_tsv, vcf_tsv + ".noHex.tsv")
+
+    # Save full CSV
     try:
-        vcf_df = dd.read_csv(vcf_tsv + ".noHex.tsv", sep = "\t", header = 1)
+        vcf_df = pd.read_csv(vcf_tsv + ".noHex.tsv", sep = "\t", header = 1, 
+                             na_values = ["-"], dtype = "object")
         if skip_spliceai:
             pass
         else:
             vcf_df = parse_splice_predictions(vcf_df, column_name)
     except KeyError:
-        vcf_df = dd.read_csv(vcf_tsv + ".noHex.tsv", sep = "\t")
+        vcf_df = pd.read_csv(vcf_tsv + ".noHex.tsv", sep = "\t", 
+                             na_values = ["-"], dtype = "object")
         if skip_spliceai:
             pass
         else:
-            vcf_df = parse_splice_predictions(vcf_df, column_name)     
+            vcf_df = parse_splice_predictions(vcf_df, column_name) 
            
     # Output full csv
     if out_full != "0":
@@ -178,7 +178,9 @@ def main():
                 "Consequence",
                 "gnomADg_AF",
                 "gnomADg_EAS_AF",
-                "ClinVar_CLNSIG"]]
+                "ClinVar_CLNSIG",
+                "ClinVar_CLNDN",  
+                "ClinVar_CLNDNINCL"]]
         else:
             vcf_df = vcf_df[[
                 "HGVSg",
@@ -191,8 +193,14 @@ def main():
                 "gnomADg_AF",
                 "gnomADg_EAS_AF",
                 "ClinVar_CLNSIG",
-                "SpliceAI_SpliceAI_highest_score"]]
+                "SpliceAI_SpliceAI_highest_score", 
+                "ClinVar_CLNDN",  
+                "ClinVar_CLNDNINCL"]]
+
     vcf_df.to_csv(out_simple, index = False)
+
+    # Return 0 for successful run
+    return 0
     
 # Run main() if this script is called from command-line    
 if __name__ == "__main__":
