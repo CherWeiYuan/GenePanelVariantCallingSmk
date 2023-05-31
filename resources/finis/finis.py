@@ -174,6 +174,8 @@ def main():
                 "HGVSp",
                 "SYMBOL",
                 "ZYG",
+                "MANE_SELECT",
+                "MANE_PLUS_CLINICAL",
                 "Existing_variation",
                 "Consequence",
                 "gnomADg_AF",
@@ -188,6 +190,8 @@ def main():
                 "HGVSp",
                 "SYMBOL",
                 "ZYG",
+                "MANE_SELECT",
+                "MANE_PLUS_CLINICAL",
                 "Existing_variation",
                 "Consequence",
                 "gnomADg_AF",
@@ -196,7 +200,6 @@ def main():
                 "SpliceAI_SpliceAI_highest_score", 
                 "ClinVar_CLNDN",  
                 "ClinVar_CLNDNINCL"]]
-
     vcf_df.to_csv(out_simple, index = False)
 
     # Return 0 for successful run
