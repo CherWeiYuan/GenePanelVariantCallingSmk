@@ -191,7 +191,7 @@ rule vep_tsv:
         "--species 'homo_sapiens' --force_overwrite --symbol --biotype "
         "--canonical --variant_class --sift b --polyphen b --humdiv "
         "--gene_phenotype --regulatory --numbers --mirna --protein --domains "
-        "--af --af_1kg --af_gnomade --af_gnomadg --individual all "
+        "--af --af_1kg --af_gnomade --af_gnomadg --individual all --mane "
         "--show_ref_allele --fasta {params.genome} --hgvs --hgvsg --offline "
         "--custom resources/vep_cache/ClinVar/clinvar.vcf.gz,"
         "ClinVar,vcf,exact,0,ClinVar,vcf,exact,0,AF_ESP,AF_EXAC,"
