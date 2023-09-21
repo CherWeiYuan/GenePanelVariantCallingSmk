@@ -1,5 +1,5 @@
 # Snakemake variant calling pipeline for gene panel
-# snakemake --cores 10 --use-conda --resources mem_mb=20000 --retries 3
+# snakemake --cores 20 --use-conda --resources mem_mb=40000 --retries 3
 
 # Important information
 #   Pipeline is engineered for GRCh38 reference genome
@@ -148,7 +148,7 @@ rule spliceai:
     output:
         "vcf/spliceai/{sample}.spliceai.vcf"
     conda:
-        "envs/spliceai_gpu.yaml"
+        "envs/spliceai-cpu.yaml"
     shell:
         "spliceai -I {input} -O {output} -R {params.genome} -A grch38 -M 1"
 
