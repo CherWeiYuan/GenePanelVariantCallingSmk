@@ -150,7 +150,7 @@ rule spliceai:
     conda:
         "envs/spliceai-cpu.yaml"
     shell:
-        "spliceai -I {input} -O {output} -R {params.genome} -A grch38 -M 1"
+        "spliceai -I {input} -O {output} -R {params.genome} -A grch38 -M 1 -D 5000"
 
 rule bgzip_spliceai:
     input:
