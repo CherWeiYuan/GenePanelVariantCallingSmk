@@ -1,5 +1,5 @@
 # Snakemake variant calling pipeline for gene panel
-# snakemake --cores 20 --use-conda --resources mem_mb=40000 --retries 3
+# snakemake --cores 1 --use-conda --resources mem_mb=30000 --retries 2 --rerun-incomplete
 
 # Important information
 #   Pipeline is engineered for GRCh38 reference genome
@@ -150,7 +150,7 @@ rule spliceai:
     conda:
         "envs/spliceai-gpu.yaml"
     shell:
-        "spliceai -I {input} -O {output} -R {params.genome} -A grch38 -M 1 -D 5000"
+        "spliceai -I {input} -O {output} -R {params.genome} -A grch38 -M 1 -D 4999"
 
 rule bgzip_spliceai:
     input:
@@ -212,9 +212,22 @@ rule finis:
         "python3 resources/finis/finis.py --vcf_tsv {input} "
         "--out_full {output.full} --out_simple {output.simple}"
 
-rule multiqc:
+rule finis_summary:
     input:
         expand("results/variants/simplified_data/{sample}.simple.csv", sample = sample_names)
+    output:
+        out="summarized_results.csv"
+    conda:
+        "envs/finis.yaml"
+    shell:
+        "python3 resources/finis/finis_summarize.py "
+        "--indir results/variants/simplified_data "
+        "--outdir results/ "
+        "-g SLC25A13 -g SLC25A15 -g ARG1 -g ASL -g ASS1 -g CPS1 -g OTC -g NAGS"
+
+rule multiqc:
+    input:
+        "results/summarized_results.csv"
     output:
         "multiqc_report.html"
     conda:
